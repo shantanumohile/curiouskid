@@ -1,0 +1,97 @@
+{
+  "nbformat": 4,
+  "nbformat_minor": 0,
+  "metadata": {
+    "colab": {
+      "provenance": [],
+      "authorship_tag": "ABX9TyP+OPHYPmDSPakYAFGNoI2n",
+      "include_colab_link": true
+    },
+    "kernelspec": {
+      "name": "python3",
+      "display_name": "Python 3"
+    },
+    "language_info": {
+      "name": "python"
+    }
+  },
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "view-in-github",
+        "colab_type": "text"
+      },
+      "source": [
+        "<a href=\"https://colab.research.google.com/github/shantanumohile/curiouskid/blob/main/Rail_Length_Web_App2_py.py\" target=\"_parent\"><img src=\"https://colab.research.google.com/assets/colab-badge.svg\" alt=\"Open In Colab\"/></a>"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "id": "QPlnX2SeOcU5"
+      },
+      "outputs": [],
+      "source": [
+        "import streamlit as st\n",
+        "import pandas as pd\n",
+        "from itertools import combinations\n",
+        "\n",
+        "st.title(\"Rail Utilisation Optimizer 🚂\")\n",
+        "st.write(\"Upload an Excel file with a column of values. The app will group them into triplets, pairs, and singles (<= 170).\")\n",
+        "\n",
+        "uploaded_file = st.file_uploader(\"Upload your Excel file\", type=[\"xlsx\"])\n",
+        "\n",
+        "target = 170\n",
+        "\n",
+        "def best_fit_group(values, target, r):\n",
+        "    best_combo = None\n",
+        "    best_sum = -1\n",
+        "    for combo in combinations(values, r):\n",
+        "        s = sum(combo)\n",
+        "        if s <= target and s > best_sum:\n",
+        "            best_sum = s\n",
+        "            best_combo = combo\n",
+        "    return list(best_combo) if best_combo else None, best_sum\n",
+        "\n",
+        "def make_groups(values, target, r):\n",
+        "    groups = []\n",
+        "    remaining = values.copy()\n",
+        "\n",
+        "    while len(remaining) >= r:\n",
+        "        combo, total = best_fit_group(remaining, target, r)\n",
+        "        if not combo:\n",
+        "            break\n",
+        "        groups.append((combo, total))\n",
+        "        for v in combo:\n",
+        "            remaining.remove(v)\n",
+        "    return groups, remaining\n",
+        "\n",
+        "if uploaded_file:\n",
+        "    df = pd.read_excel(uploaded_file, sheet_name=\"Sheet1\")\n",
+        "    values = df[\"ColumnName\"].dropna().tolist()  # change ColumnName to your actual column name\n",
+        "\n",
+        "    triplets, remaining_after_triplets = make_groups(values, target, 3)\n",
+        "    pairs, remaining_after_pairs = make_groups(remaining_after_triplets, target, 2)\n",
+        "    singles, remaining_final = make_groups(remaining_after_pairs, target, 1)\n",
+        "\n",
+        "    st.subheader(\"Triplets\")\n",
+        "    for g, s in triplets:\n",
+        "        st.write(f\"{g} → Sum: {s}\")\n",
+        "\n",
+        "    st.subheader(\"Pairs\")\n",
+        "    for g, s in pairs:\n",
+        "        st.write(f\"{g} → Sum: {s}\")\n",
+        "\n",
+        "    st.subheader(\"Singles\")\n",
+        "    for g, s in singles:\n",
+        "        st.write(f\"{g} → Sum: {s}\")\n",
+        "\n",
+        "    if remaining_final:\n",
+        "        st.subheader(\"Unassigned values\")\n",
+        "        st.write(remaining_final)\n"
+      ]
+    }
+  ]
+}
