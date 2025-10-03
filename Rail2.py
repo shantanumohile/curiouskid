@@ -44,8 +44,15 @@ if uploaded_file:
     try:
         # Determine file type
         if uploaded_file.name.endswith((".xlsx", ".xls")):
-            import openpyxl  # Ensure openpyxl is installed
-            df = pd.read_excel(uploaded_file)
+            try:
+                import openpyxl  # Check if installed
+                df = pd.read_excel(uploaded_file)
+            except ModuleNotFoundError:
+                st.error(
+                    "Reading Excel files requires 'openpyxl'. "
+                    "Please install it via 'pip install openpyxl' or upload a CSV file instead."
+                )
+                st.stop()
         else:
             df = pd.read_csv(uploaded_file)
 
