@@ -1,17 +1,18 @@
 import streamlit as st
 import pandas as pd
 from itertools import combinations
+import io
 
 st.set_page_config(page_title="Rail Utilisation Optimizer 🚂", layout="centered")
 
 st.title("Rail Utilisation Optimizer 🚂")
 st.write(
-    "Upload an Excel (.xlsx/.xls) or CSV file with values in the **first column**. "
+    "Upload an Excel (.xlsx/.xls) or CSV file with numeric values in the **first column**. "
     "The app will group them into triplets, pairs, and singles (<= Rail Size)."
 )
 
 # Upload file
-uploaded_file = st.file_uploader("Upload your Excel or CSV file", type=["xlsx", "xls", "csv"])
+uploaded_file = st.file_uploader("Upload your file", type=["xlsx", "xls", "csv"])
 
 # User input for rail size
 target = st.number_input("Enter Rail Size", min_value=1, value=170, step=1)
@@ -42,19 +43,26 @@ def make_groups(values, target, r):
 
 if uploaded_file:
     try:
-        # Determine file type
-        if uploaded_file.name.endswith((".xlsx", ".xls")):
-            try:
-                import openpyxl  # Check if installed
-                df = pd.read_excel(uploaded_file)
-            except ModuleNotFoundError:
-                st.error(
-                    "Reading Excel files requires 'openpyxl'. "
-                    "Please install it via 'pip install openpyxl' or upload a CSV file instead."
-                )
-                st.stop()
-        else:
+        # Detect file type
+        if uploaded_file.name.endswith(".csv"):
             df = pd.read_csv(uploaded_file)
+        else:
+            # For .xlsx or .xls, try reading via ExcelFile fallback without openpyxl
+            try:
+                df = pd.read_excel(uploaded_file, engine='xlrd')  # works for .xls
+            except:
+                st.warning(
+                    "Cannot read Excel file directly without 'openpyxl'. "
+                    "Converting to CSV internally..."
+                )
+                # Convert Excel bytes to CSV in memory
+                try:
+                    xls = pd.ExcelFile(uploaded_file)
+                    df = pd.concat([xls.parse(sheet) for sheet in xls.sheet_names])
+                    st.info("Excel file loaded successfully as CSV internally.")
+                except Exception as e:
+                    st.error(f"Failed to read Excel file: {e}")
+                    st.stop()
 
         # Take first column
         values = df[df.columns[0]].dropna().tolist()
