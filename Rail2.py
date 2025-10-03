@@ -1,14 +1,13 @@
 import streamlit as st
 import pandas as pd
 from itertools import combinations
-import io
 
 st.set_page_config(page_title="Rail Utilisation Optimizer 🚂", layout="centered")
 
 st.title("Rail Utilisation Optimizer 🚂")
 st.write(
     "Upload an Excel (.xlsx/.xls) or CSV file with numeric values in the **first column**. "
-    "The app will group them into triplets, pairs, and singles (<= Rail Size)."
+    "The app will group them into triplets, pairs, and singles (≤ Rail Size)."
 )
 
 # Upload file
@@ -18,7 +17,6 @@ uploaded_file = st.file_uploader("Upload your file", type=["xlsx", "xls", "csv"]
 target = st.number_input("Enter Rail Size", min_value=1, value=170, step=1)
 
 def best_fit_group(values, target, r):
-    """Find r numbers whose sum is the largest possible <= target."""
     best_combo = None
     best_sum = -1
     for combo in combinations(values, r):
@@ -29,7 +27,6 @@ def best_fit_group(values, target, r):
     return list(best_combo) if best_combo else None, best_sum
 
 def make_groups(values, target, r):
-    """Make as many disjoint groups of size r as possible without exceeding target."""
     groups = []
     remaining = values.copy()
     while len(remaining) >= r:
@@ -43,20 +40,19 @@ def make_groups(values, target, r):
 
 if uploaded_file:
     try:
-        # Detect file type
+        # CSV handling with UTF-8 fallback to Latin1
         if uploaded_file.name.endswith(".csv"):
-            df = pd.read_csv(uploaded_file)
+            try:
+                df = pd.read_csv(uploaded_file, encoding='utf-8')
+            except UnicodeDecodeError:
+                df = pd.read_csv(uploaded_file, encoding='latin1')
         else:
-            # For .xlsx or .xls, try reading via ExcelFile fallback without openpyxl
+            # Excel handling without openpyxl
             try:
                 df = pd.read_excel(uploaded_file, engine='xlrd')  # works for .xls
             except:
-                st.warning(
-                    "Cannot read Excel file directly without 'openpyxl'. "
-                    "Converting to CSV internally..."
-                )
-                # Convert Excel bytes to CSV in memory
                 try:
+                    # fallback: read all sheets and concatenate
                     xls = pd.ExcelFile(uploaded_file)
                     df = pd.concat([xls.parse(sheet) for sheet in xls.sheet_names])
                     st.info("Excel file loaded successfully as CSV internally.")
