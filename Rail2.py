@@ -1,84 +1,79 @@
 import streamlit as st
 from itertools import combinations
+import copy
 
-st.set_page_config(page_title="Rail Utilisation Optimizer 🚂", layout="centered")
+st.set_page_config(page_title="Rail Optimizer - Optimal Solution", layout="centered")
 
-st.title("Rail Utilisation Optimizer 🚂")
+st.title("Rail Optimiser 🚂 (Optimal)")
 st.write(
     "Paste your numeric values below (comma, space, or newline separated). "
-    "The app will group them into triplets, pairs, and singles (≤ Rail Size)."
+    "The app will group them into rails (≤ Rail Size) to **minimize total rails used**."
 )
 
-# Text input
+# Input numbers
 input_text = st.text_area("Paste your numbers here", height=150)
-
-# Rail size
 target = st.number_input("Enter Rail Size", min_value=1, value=170, step=1)
 
-def best_fit_group(values, target, r):
-    best_combo = None
-    best_sum = -1
-    for combo in combinations(values, r):
-        s = sum(combo)
-        if s <= target and s > best_sum:
-            best_sum = s
-            best_combo = combo
-    return list(best_combo) if best_combo else None, best_sum
-
-def make_groups(values, target, r):
-    groups = []
-    remaining = values.copy()
-    while len(remaining) >= r:
-        combo, total = best_fit_group(remaining, target, r)
-        if not combo:
-            break
-        groups.append((combo, total))
-        for v in combo:
-            remaining.remove(v)
-    return groups, remaining
-
-if input_text:
-    # Split by commas, spaces, or newlines
+def parse_input(input_text):
     import re
     raw_values = re.split(r'[,\s]+', input_text.strip())
-    
-    # Keep only numeric values
     values = []
     for v in raw_values:
         try:
             values.append(float(v))
         except:
             pass
-    
+    return values
+
+def find_best_bin_packing(values, rail_size):
+    """
+    Try all combinations of 1, 2, or 3 numbers to fill rails optimally.
+    Returns list of rails.
+    """
+    remaining = sorted(values, reverse=True)
+    rails = []
+
+    while remaining:
+        best_combo = None
+        best_sum = -1
+
+        # Generate all combos of size 1,2,3
+        for r in range(3, 0, -1):
+            for combo in combinations(remaining, r):
+                s = sum(combo)
+                if s <= rail_size and s > best_sum:
+                    best_sum = s
+                    best_combo = combo
+
+        # If no combo found (shouldn't happen), take largest single
+        if not best_combo:
+            best_combo = [remaining[0]]
+            best_sum = remaining[0]
+
+        rails.append((list(best_combo), best_sum))
+        # Remove used numbers
+        for num in best_combo:
+            remaining.remove(num)
+
+    return rails
+
+if input_text:
+    values = parse_input(input_text)
     if not values:
         st.error("No numeric values found in the input.")
     else:
-        # Build groups
-        triplets, rem1 = make_groups(values, target, 3)
-        pairs, rem2 = make_groups(rem1, target, 2)
-        singles, rem3 = make_groups(rem2, target, 1)
+        rails = find_best_bin_packing(values, target)
         
-        st.subheader("📌 Triplets")
-        if triplets:
-            for g, s in triplets:
-                st.write(f"{g} → Sum: {s}")
-        else:
-            st.write("No valid triplets found.")
+        # Calculate total wastage
+        total_wastage = sum(target - s for _, s in rails)
+        total_rails = len(rails)
+        
+        # Display summary at the top
+        st.subheader("📊 Summary")
+        st.write(f"**Total Rails:** {total_rails}")
+        st.write(f"**Total Wastage:** {total_wastage}")
 
-        st.subheader("📌 Pairs")
-        if pairs:
-            for g, s in pairs:
-                st.write(f"{g} → Sum: {s}")
-        else:
-            st.write("No valid pairs found.")
-
-        st.subheader("📌 Singles")
-        if singles:
-            for g, s in singles:
-                st.write(f"{g} → Sum: {s}")
-        else:
-            st.write("No valid singles found.")
-
-        if rem3:
-            st.subheader("📌 Unassigned values")
-            st.write(rem3)
+        # Display each rail
+        st.subheader("📌 Rails")
+        for i, (nums, s) in enumerate(rails, 1):
+            st.write(f"Rail {i}: {nums} → Sum: {s} (Wastage: {target - s})")
