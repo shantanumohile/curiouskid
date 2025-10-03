@@ -40,28 +40,30 @@ def make_groups(values, target, r):
 
 if uploaded_file:
     try:
-        # CSV handling with UTF-8 fallback to Latin1
+        # Handle CSV files
         if uploaded_file.name.endswith(".csv"):
             try:
-                df = pd.read_csv(uploaded_file, encoding='utf-8')
+                # Try UTF-8 first
+                df = pd.read_csv(uploaded_file, encoding='utf-8', sep=None, engine='python', header=None)
             except UnicodeDecodeError:
-                df = pd.read_csv(uploaded_file, encoding='latin1')
+                # Fallback to Latin1
+                df = pd.read_csv(uploaded_file, encoding='latin1', sep=None, engine='python', header=None)
         else:
-            # Excel handling without openpyxl
+            # Handle Excel files
             try:
-                df = pd.read_excel(uploaded_file, engine='xlrd')  # works for .xls
+                df = pd.read_excel(uploaded_file, sheet_name=0)  # first sheet
             except:
-                try:
-                    # fallback: read all sheets and concatenate
-                    xls = pd.ExcelFile(uploaded_file)
-                    df = pd.concat([xls.parse(sheet) for sheet in xls.sheet_names])
-                    st.info("Excel file loaded successfully as CSV internally.")
-                except Exception as e:
-                    st.error(f"Failed to read Excel file: {e}")
-                    st.stop()
+                # fallback: read all sheets and concatenate
+                xls = pd.ExcelFile(uploaded_file)
+                df = pd.concat([xls.parse(sheet) for sheet in xls.sheet_names])
+                st.info("Excel file loaded successfully as CSV internally.")
 
         # Take first column
-        values = df[df.columns[0]].dropna().tolist()
+        if df.shape[1] == 0:
+            st.error("No columns found in the file.")
+            st.stop()
+
+        values = df.iloc[:, 0].dropna().tolist()
 
         # Keep only numeric values
         cleaned_values = []
@@ -73,36 +75,37 @@ if uploaded_file:
 
         if not cleaned_values:
             st.error("No numeric values found in the first column.")
+            st.stop()
+
+        # Build groups
+        triplets, rem1 = make_groups(cleaned_values, target, 3)
+        pairs, rem2 = make_groups(rem1, target, 2)
+        singles, rem3 = make_groups(rem2, target, 1)
+
+        st.subheader("📌 Triplets")
+        if triplets:
+            for g, s in triplets:
+                st.write(f"{g} → Sum: {s}")
         else:
-            # Build groups
-            triplets, rem1 = make_groups(cleaned_values, target, 3)
-            pairs, rem2 = make_groups(rem1, target, 2)
-            singles, rem3 = make_groups(rem2, target, 1)
+            st.write("No valid triplets found.")
 
-            st.subheader("📌 Triplets")
-            if triplets:
-                for g, s in triplets:
-                    st.write(f"{g} → Sum: {s}")
-            else:
-                st.write("No valid triplets found.")
+        st.subheader("📌 Pairs")
+        if pairs:
+            for g, s in pairs:
+                st.write(f"{g} → Sum: {s}")
+        else:
+            st.write("No valid pairs found.")
 
-            st.subheader("📌 Pairs")
-            if pairs:
-                for g, s in pairs:
-                    st.write(f"{g} → Sum: {s}")
-            else:
-                st.write("No valid pairs found.")
+        st.subheader("📌 Singles")
+        if singles:
+            for g, s in singles:
+                st.write(f"{g} → Sum: {s}")
+        else:
+            st.write("No valid singles found.")
 
-            st.subheader("📌 Singles")
-            if singles:
-                for g, s in singles:
-                    st.write(f"{g} → Sum: {s}")
-            else:
-                st.write("No valid singles found.")
-
-            if rem3:
-                st.subheader("📌 Unassigned values")
-                st.write(rem3)
+        if rem3:
+            st.subheader("📌 Unassigned values")
+            st.write(rem3)
 
     except Exception as e:
         st.error(f"Error reading file: {e}")
